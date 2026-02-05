@@ -19,9 +19,15 @@ from polyglot.docker_build import (build_container, build_env_images,
                                    cleanup_container)
 from polyglot.test_spec import make_test_spec
 from prompts.testrepo_prompt import get_test_description
-from swe_bench.utils import (copy_from_container, copy_to_container,
-                             log_container_output, remove_existing_container,
-                             safe_log, setup_logger)
+from swe_bench.utils import (
+    copy_from_container,
+    copy_to_container,
+    log_container_output,
+    remove_existing_container,
+    safe_log,
+    setup_logger,
+)
+from utils.docker_utils import get_docker_client
 from utils.git_utils import filter_patch_by_files, remove_patch_by_files
 
 llm = ""
@@ -64,7 +70,7 @@ def process_entry(
 
     try:
         # Create and start the Docker container
-        client = docker.from_env()
+        client = get_docker_client()
         run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         # Set up thread-specific logger
         logger = setup_logger(str(out_dname / f"{instance_id}_docker.log"))
@@ -368,7 +374,7 @@ def harness(
     entries = [entry for entry in entries if entry["instance_id"] in test_task_list]
 
     # Build the environment images
-    client = docker.from_env()
+    client = get_docker_client()
     build_env_images(
         client, dataset=entries, max_workers=max_workers, force_rebuild=False
     )

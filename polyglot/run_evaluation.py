@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import docker
+from utils.docker_utils import get_docker_client
 from swebench.harness.constants import (APPLY_PATCH_FAIL, APPLY_PATCH_PASS,
                                         INSTANCE_IMAGE_BUILD_DIR,
                                         KEY_INSTANCE_ID,
@@ -242,7 +243,7 @@ def run_instances(
         run_id (str): Run ID
         timeout (int): Timeout for running tests
     """
-    client = docker.from_env()
+    client = get_docker_client()
     test_specs = list(map(make_test_spec, instances))
 
     # print number of existing instance images
@@ -517,7 +518,7 @@ def main(
     # set open file limit
     assert len(run_id) > 0, "Run ID must be provided"
     resource.setrlimit(resource.RLIMIT_NOFILE, (open_file_limit, open_file_limit))
-    client = docker.from_env()
+    client = get_docker_client()
 
     # load predictions as map of instance_id to prediction
     if predictions_path == "gold":

@@ -6,6 +6,6 @@ docker system prune -f
 
 # Initialize conda for the current shell and activate environment
 eval "$(conda shell.bash hook)"
-conda activate agent
+conda activate hgm
 
 python hgm.py

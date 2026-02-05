@@ -387,6 +387,9 @@ def main():
                 for node in hgm_utils.nodes.values()
                 if np.isfinite(node.mean_utility) and node.mean_utility > 0
             ]
+            if len(nodes) == 0:
+                # Fallback to all nodes when no finite, positive utilities exist yet.
+                nodes = list(hgm_utils.nodes.values())
             decendant_evals = [
                 node.get_decendant_evals(num_pseudo=opt_cfg.n_pseudo_descendant_evals)
                 for node in nodes

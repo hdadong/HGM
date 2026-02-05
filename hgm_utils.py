@@ -23,11 +23,17 @@ from self_improve_step import diagnose_problem, save_metadata  # , choose
 from swe_bench.harness import harness as swe_harness
 from swe_bench.report import make_report
 from utils.common_utils import load_json_file
-from utils.docker_utils import (build_hgm_container, cleanup_container,
-                                copy_from_container, copy_to_container,
-                                log_container_output,
-                                remove_existing_container, safe_log,
-                                setup_logger)
+from utils.docker_utils import (
+    build_hgm_container,
+    cleanup_container,
+    copy_from_container,
+    copy_to_container,
+    get_docker_client,
+    log_container_output,
+    remove_existing_container,
+    safe_log,
+    setup_logger,
+)
 from utils.eval_utils import get_acc_on_tasks
 from utils.evo_utils import (get_all_performance, get_model_patch_paths,
                              is_compiled_self_improve)
@@ -283,6 +289,7 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
     out_dir_base = output_dir  # out_dir_base should be /hgm/output_selfimprove/ or /hgm/output_hgm/{hgm_run_id}/
     run_output_dir = os.path.join(root_dir, f"{output_dir}/{run_id}/")
     os.makedirs(run_output_dir, exist_ok=True)
+    container = None
 
     try:
         if parent_commit == "failed":
@@ -302,7 +309,7 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
         metadata["parent_commit"] = parent_commit
 
         container_name = f"hgm-container-{run_id}"
-        client = docker.from_env()
+        client = get_docker_client()
         remove_existing_container(client, container_name)
         container = build_hgm_container(
             client,
@@ -461,7 +468,8 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
             return "failed"
     finally:
         try:
-            cleanup_container(container)
+            if container is not None:
+                cleanup_container(container)
         except Exception as e:
             safe_log(f"Error during container cleanup: {e}")
         save_metadata(metadata, run_output_dir)

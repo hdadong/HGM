@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List, Optional, Set, Union
 
 import docker
+from docker.errors import DockerException
 import pathspec
 
 
@@ -200,7 +201,42 @@ def safe_log(message: str, level: int = logging.INFO):
     """Thread-safe logging function."""
     logger = get_thread_logger()
     if logger:
-        logger.log(level, message)
+    logger.log(level, message)
+
+
+def get_docker_client():
+    """Return a Docker client, falling back to a local Podman socket when needed."""
+    try:
+        return docker.from_env()
+    except DockerException as e:
+        last_err = e
+
+    candidates = []
+    xdg_runtime = os.getenv("XDG_RUNTIME_DIR")
+    if xdg_runtime:
+        candidates.append(os.path.join(xdg_runtime, "podman", "podman.sock"))
+
+    uid = os.getuid()
+    candidates.extend(
+        [
+            f"/run/user/{uid}/podman/podman.sock",
+            f"/var/run/user/{uid}/podman/podman.sock",
+            "/run/podman/podman.sock",
+            "/var/run/podman/podman.sock",
+        ]
+    )
+
+    for sock in candidates:
+        if os.path.exists(sock):
+            try:
+                return docker.DockerClient(base_url=f"unix://{sock}")
+            except DockerException as e:
+                last_err = e
+
+    raise DockerException(
+        "Unable to connect to Docker or Podman socket. "
+        "Set DOCKER_HOST to a valid socket path if needed."
+    ) from last_err
     else:
         print(f"Warning: No logger found for thread {threading.get_ident()}")
 
