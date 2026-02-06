@@ -2,14 +2,9 @@
 
 # Language Model Configuration
 llm:
-  # Model used for self-improvement tasks
-  self_improve_llm: "gpt-5-mini"
-  
-  # Model used for downstream evaluation tasks
-  downstream_llm: "gpt-5-mini"
-  
-  # Model used for problem diagnosis
-  diagnose_llm: "gpt-5-mini"
+  self_improve_llm: "deepseek-chat"
+  downstream_llm: "deepseek-chat"
+  diagnose_llm: "deepseek-chat"
 
 # Optimization Algorithm Parameters
 optimization:

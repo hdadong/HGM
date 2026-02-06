@@ -340,16 +340,21 @@ def main():
             "./polyglot/subsets/small.json"
         )
 
-    src_path, submitted_ids = initialize_run(
-        output_dir,
-        llm_cfg.self_improve_llm,
-        tasks,
-        path_cfg.initial_agent_name,
-        prevrun_dir=path_cfg.continue_from,
-        polyglot=eval_cfg.polyglot,
-        timeout=exec_cfg.self_improve_timeout,
-        max_workers=exec_cfg.max_workers
-    )
+    try:
+        src_path, submitted_ids = initialize_run(
+            output_dir,
+            llm_cfg.self_improve_llm,
+            tasks,
+            path_cfg.initial_agent_name,
+            prevrun_dir=path_cfg.continue_from,
+            polyglot=eval_cfg.polyglot,
+            timeout=exec_cfg.self_improve_timeout,
+            max_workers=exec_cfg.max_workers,
+        )
+    except RuntimeError as e:
+        logger.error(str(e))
+        print(str(e))
+        return
     total_num_tasks = len(hgm_utils.total_tasks)
 
     # Set up logger

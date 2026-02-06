@@ -29,6 +29,16 @@ def create_client(model: str):
             openai.OpenAI(base_url=f"http://{model[11:]}:8000/v1", api_key="dummy"),
             model,
         )
+    elif model.startswith("deepseek-"):
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise ValueError(f"DEEPSEEK_API_KEY is not set, but model '{model}' was requested.")
+        print(f"Using DeepSeek API with model {model}.")
+        client = openai.OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com"
+        )
+        return client, model
     else:
         print(f"Using OpenRouter API with model {model}.")
         return (

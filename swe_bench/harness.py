@@ -7,7 +7,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import docker
 from datasets import load_dataset
 from swebench.harness.docker_build import (build_container, build_env_images,
                                            cleanup_container)
@@ -18,6 +17,7 @@ from swe_bench.utils import (copy_from_container, copy_to_container,
                              log_container_output, remove_existing_container,
                              safe_log, setup_logger)
 from utils.common_utils import load_json_file
+from utils.docker_utils import get_docker_client
 
 llm = ""  # Global variable to hold the LLM model name or path
 timeout = 1800
@@ -47,7 +47,9 @@ def process_entry(
 
     try:
         # Create and start the Docker container
-        client = docker.from_env()
+        client = get_docker_client(
+            context=f"SWE-bench instance setup for {instance_id}"
+        )
         run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         # Set up thread-specific logger
         logger = setup_logger(str(out_dname / f"{instance_id}_docker.log"))
@@ -172,6 +174,8 @@ def process_entry(
             "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
             "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
             "OpenRouter_API_KEY": os.getenv("OpenRouter_API_KEY"),
+            "DEEPSEEK_API_KEY": os.getenv('DEEPSEEK_API_KEY'),
+
         }
         safe_log("Running the agent")
         cmd = [
@@ -302,7 +306,7 @@ def harness(
     entries = [entry for entry in entries if entry["instance_id"] in test_task_list]
 
     # Build the environment images
-    client = docker.from_env()
+    client = get_docker_client(context="SWE-bench harness setup")
     build_env_images(
         client, dataset=entries, force_rebuild=False, max_workers=max_workers
     )

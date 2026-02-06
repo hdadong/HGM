@@ -13,8 +13,9 @@ import openai
 from llm import create_client
 from tools import load_all_tools
 
-CLAUDE_MODEL = "anthropic/claude-sonnet-4"
-OPENAI_MODEL = "gpt-5"
+
+CLAUDE_MODEL = 'deepseek-chat'
+OPENAI_MODEL = 'deepseek-chat'
 
 
 def process_tool_call(tools_dict, tool_name, tool_input):

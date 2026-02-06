@@ -12,7 +12,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from statistics import stdev
 
-import docker
 import numpy as np
 
 import self_improve_step
@@ -25,6 +24,7 @@ from swe_bench.report import make_report
 from utils.common_utils import load_json_file
 from utils.docker_utils import (build_hgm_container, cleanup_container,
                                 copy_from_container, copy_to_container,
+                                get_docker_client,
                                 log_container_output,
                                 remove_existing_container, safe_log,
                                 setup_logger)
@@ -302,7 +302,7 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
         metadata["parent_commit"] = parent_commit
 
         container_name = f"hgm-container-{run_id}"
-        client = docker.from_env()
+        client = get_docker_client(context="HGM self-improvement container setup")
         remove_existing_container(client, container_name)
         container = build_hgm_container(
             client,

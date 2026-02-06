@@ -15,6 +15,26 @@ import docker
 import pathspec
 
 
+def get_docker_client(context: str = "This operation"):
+    """
+    Create a Docker client and verify daemon connectivity.
+    Raises a RuntimeError with actionable setup guidance when unavailable.
+    """
+    try:
+        client = docker.from_env()
+        client.ping()
+        return client
+    except docker.errors.DockerException as e:
+        docker_host = os.environ.get("DOCKER_HOST", "unix:///var/run/docker.sock")
+        raise RuntimeError(
+            f"{context} requires Docker daemon access, but connection to {docker_host} "
+            f"failed: {e}\n"
+            "Run `docker run hello-world` to verify Docker.\n"
+            "If you see a permission error, run `newgrp docker` or start a new login "
+            "session after adding your user to the docker group."
+        ) from e
+
+
 def read_dockerignore(dockerignore_path: str) -> List[str]:
     """Read and parse .dockerignore file, removing comments and empty lines."""
     patterns = []
