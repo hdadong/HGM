@@ -278,6 +278,7 @@ def eval_agent(
 
 def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
     metadata = {}
+    container = None
     root_dir = os.path.abspath("./")  # root_dir should be /hgm
     run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     out_dir_base = output_dir  # out_dir_base should be /hgm/output_selfimprove/ or /hgm/output_hgm/{hgm_run_id}/
@@ -384,9 +385,15 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
         if not problem_statement:
             safe_log("Failed to diagnose the problem statement. Exiting.")
             cleanup_container(container)
+            container = None
             save_metadata(metadata, run_output_dir)
             if max_try > 1:
-                return sample_child(parent_commit, force_rebuild, max_try - 1)
+                return sample_child(
+                    parent_commit,
+                    image_name,
+                    force_rebuild=force_rebuild,
+                    max_try=max_try - 1,
+                )
             else:
                 return "failed"
 
@@ -401,6 +408,7 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
             "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
             "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
             "OpenRouter_API_KEY": os.getenv("OpenRouter_API_KEY"),
+            "DEEPSEEK_API_KEY": os.getenv("DEEPSEEK_API_KEY"),
         }
         cmd = [
             "timeout",
@@ -454,15 +462,21 @@ def sample_child(parent_commit, image_name, force_rebuild=False, max_try=1):
         if max_try > 1:
             safe_log(f"Error while sampling a child: {str(e)}. Retrying...")
             safe_log(traceback.format_exc())
-            return sample_child(parent_commit, force_rebuild, max_try - 1)
+            return sample_child(
+                parent_commit,
+                image_name,
+                force_rebuild=force_rebuild,
+                max_try=max_try - 1,
+            )
         else:
             safe_log(f"Error while sampling a child: {str(e)}")
             safe_log(traceback.format_exc())
             return "failed"
     finally:
-        try:
-            cleanup_container(container)
-        except Exception as e:
-            safe_log(f"Error during container cleanup: {e}")
+        if container is not None:
+            try:
+                cleanup_container(container)
+            except Exception as e:
+                safe_log(f"Error during container cleanup: {e}")
         save_metadata(metadata, run_output_dir)
     return run_id

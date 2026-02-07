@@ -47,6 +47,7 @@ python -m polyglot.prepare_polyglot_dataset
 ## Running the HGM
 ```bash
 ./run.sh
+python hgm.py --output_dir=test1 
 ```
 
 ## Safety Consideration

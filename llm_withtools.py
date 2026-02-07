@@ -2,6 +2,7 @@
 
 import ast
 import copy
+import inspect
 import json
 import re
 from time import time
@@ -21,7 +22,36 @@ OPENAI_MODEL = 'deepseek-chat'
 def process_tool_call(tools_dict, tool_name, tool_input):
     try:
         if tool_name in tools_dict:
-            return tools_dict[tool_name]["function"](**tool_input)
+            tool_function = tools_dict[tool_name]["function"]
+
+            # Standard path: object-like tool input.
+            if isinstance(tool_input, dict):
+                return tool_function(**tool_input)
+
+            # Fallback: scalar input for single-arg tools or command-like tools.
+            signature = inspect.signature(tool_function)
+            required_params = [
+                p
+                for p in signature.parameters.values()
+                if p.default is inspect._empty
+                and p.kind
+                in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+            ]
+
+            if len(required_params) == 1:
+                return tool_function(**{required_params[0].name: tool_input})
+
+            if "command" in signature.parameters:
+                return tool_function(command=tool_input)
+
+            return (
+                f"Error executing tool '{tool_name}': tool_input must be an object "
+                f"for this tool, got {type(tool_input).__name__}"
+            )
         else:
             return f"Error: Tool '{tool_name}' not found"
     except Exception as e:
@@ -89,22 +119,74 @@ def get_response_withtools(
         raise  # Re-raise the exception after logging
 
 
-def check_for_tool_use(response, model=""):
+def _log_parse_failure(logging, message):
+    if logging:
+        try:
+            logging(message)
+        except Exception:
+            pass
+
+
+def _truncate_text(text, max_len=300):
+    text = text or ""
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + "..."
+
+
+def _parse_tool_input(raw, logging=None, context="tool_input"):
+    # Already structured.
+    if isinstance(raw, (dict, list, int, float, bool)) or raw is None:
+        return raw
+
+    text = str(raw).strip()
+    if not text:
+        _log_parse_failure(logging, f"{context} is empty")
+        return None
+
+    # Preferred parser for provider tool-call arguments.
+    try:
+        return json.loads(text)
+    except Exception as e_json:
+        json_err = str(e_json)
+
+    # Best-effort fallback for quasi-Python literals.
+    try:
+        return ast.literal_eval(text)
+    except Exception as e_lit:
+        _log_parse_failure(
+            logging,
+            (
+                f"Failed to parse {context} as JSON/literal; using raw string. "
+                f"json_error={json_err}; literal_error={str(e_lit)}; "
+                f"snippet={_truncate_text(text)}"
+            ),
+        )
+        return text
+
+
+def check_for_tool_use(response, model="", logging=None):
     """
     Checks if the response contains a tool call.
     """
 
     if model.startswith("o") or "gpt" in model.lower():
         # OpenAI, check for tool_calls in response
-        for tool_call in response.output:
-            if tool_call.type == "function_call":
+        tool_call = None
+        for call in response.output:
+            if call.type == "function_call":
+                tool_call = call
                 break
 
         if tool_call:
             return {
                 "tool_id": tool_call.call_id,
                 "tool_name": tool_call.name,
-                "tool_input": json.loads(tool_call.arguments),
+                "tool_input": _parse_tool_input(
+                    tool_call.arguments,
+                    logging=logging,
+                    context=f"tool arguments for {tool_call.name}",
+                ),
             }
 
     else:
@@ -117,7 +199,11 @@ def check_for_tool_use(response, model=""):
         return {
             "tool_id": call.id,
             "tool_name": call.function.name,
-            "tool_input": json.loads(call.function.arguments),
+            "tool_input": _parse_tool_input(
+                call.function.arguments,
+                logging=logging,
+                context=f"tool arguments for {call.function.name}",
+            ),
         }
 
     # No tool use found
@@ -239,7 +325,9 @@ def chat_with_agent_openai(
                 logging=logging,
             )
             logging(f"Tool Response: {response}")
-            tool_use = check_for_tool_use(response, model=client_model)
+            tool_use = check_for_tool_use(
+                response, model=client_model, logging=logging
+            )
             new_msg_history += response.output
             if not tool_use:
                 return new_msg_history, i + 1
@@ -307,7 +395,9 @@ def chat_with_agent_open_router(
             new_msg_history.append(response.choices[0].message)
             logging(f"Tool Response: {response}")
             # Check for next tool use
-            tool_use = check_for_tool_use(response, model=client_model)
+            tool_use = check_for_tool_use(
+                response, model=client_model, logging=logging
+            )
             if not tool_use:
                 return new_msg_history, i + 1
             tool_name = tool_use["tool_name"]
